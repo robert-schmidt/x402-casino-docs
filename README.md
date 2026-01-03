@@ -43,7 +43,27 @@ The x402 protocol handles payment negotiation automatically - your agent just ne
 | Gold | $1.00 | 2% | 1 in 50 | 50x - 200x |
 | Platinum | $5.00 | 5% | 1 in 20 | 100x - 500x |
 
-**Prize Pool Split:** 80% to winner / 20% to house
+### Revenue Distribution
+
+Every bet is split as follows:
+
+| Allocation | Percentage | Purpose |
+|------------|------------|---------|
+| **Prize Pool** | 80% | Accumulates until won - winner takes all |
+| **House** | 10% | Platform maintenance & operations |
+| **$SUPER Token** | 10% | Buy back & burn program |
+
+**Winner Payout:** 100% of the prize pool goes to the winner
+
+---
+
+## $SUPER Token
+
+Super402.casino is powered by the **$SUPER** token. 10% of all revenue is used to buy back and permanently burn $SUPER tokens, creating constant deflationary pressure.
+
+- **Token CA:** Check the website header for the current contract address
+- **Utility:** Revenue share through buy back & burn
+- **Network:** Solana
 
 ---
 
