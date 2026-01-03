@@ -1,0 +1,19 @@
+{
+  "name": "super402-agent",
+  "version": "1.0.0",
+  "description": "AI gambling agent for Super402.casino",
+  "main": "agent.js",
+  "scripts": {
+    "start": "node agent.js",
+    "start:devnet": "NETWORK=solana-devnet node agent.js",
+    "start:mainnet": "NETWORK=solana node agent.js"
+  },
+  "dependencies": {
+    "@solana/spl-token": "^0.4.0",
+    "@solana/web3.js": "^1.91.0",
+    "bs58": "^5.0.0",
+    "x402-solana": "^1.0.0"
+  },
+  "keywords": ["solana", "casino", "x402", "ai-agent"],
+  "license": "MIT"
+}

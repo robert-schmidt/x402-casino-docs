@@ -1,0 +1,110 @@
+# GitHub Actions workflow for Super402.casino gambling agent
+# Save this as .github/workflows/gamble.yml in your repository
+#
+# This workflow:
+# - Runs automatically every hour
+# - Can be triggered manually with custom parameters
+# - Plays games on your chosen tier
+# - Logs results to GitHub Actions output
+#
+# Setup:
+# 1. Copy this file to .github/workflows/gamble.yml
+# 2. Add repository secrets:
+#    - WALLET_PRIVATE_KEY: Your base58 private key
+#    - NETWORK: solana-devnet or solana
+#    - RPC_URL: Your RPC endpoint
+
+name: Gambling Agent
+
+on:
+  # Run every hour
+  schedule:
+    - cron: '0 * * * *'
+
+  # Manual trigger with options
+  workflow_dispatch:
+    inputs:
+      tier:
+        description: 'Betting tier'
+        required: true
+        default: 'bronze'
+        type: choice
+        options:
+          - bronze
+          - silver
+          - gold
+          - platinum
+
+      attempts:
+        description: 'Number of games to play'
+        required: true
+        default: '5'
+        type: string
+
+      network:
+        description: 'Network to use'
+        required: true
+        default: 'solana-devnet'
+        type: choice
+        options:
+          - solana-devnet
+          - solana
+
+jobs:
+  gamble:
+    runs-on: ubuntu-latest
+    name: Play Casino Games
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Check wallet balance
+        env:
+          WALLET_PRIVATE_KEY: ${{ secrets.WALLET_PRIVATE_KEY }}
+          NETWORK: ${{ github.event.inputs.network || secrets.NETWORK || 'solana-devnet' }}
+          RPC_URL: ${{ secrets.RPC_URL || 'https://api.devnet.solana.com' }}
+        run: |
+          echo "Checking wallet balance..."
+          node -e "
+            const { Keypair, Connection } = require('@solana/web3.js');
+            const bs58 = require('bs58');
+            const wallet = Keypair.fromSecretKey(bs58.decode(process.env.WALLET_PRIVATE_KEY));
+            const conn = new Connection(process.env.RPC_URL);
+            conn.getBalance(wallet.publicKey).then(b => {
+              console.log('Wallet:', wallet.publicKey.toString());
+              console.log('SOL Balance:', b / 1e9);
+            });
+          "
+
+      - name: Run gambling agent
+        env:
+          WALLET_PRIVATE_KEY: ${{ secrets.WALLET_PRIVATE_KEY }}
+          CASINO_URL: https://super402.casino
+          NETWORK: ${{ github.event.inputs.network || secrets.NETWORK || 'solana-devnet' }}
+          RPC_URL: ${{ secrets.RPC_URL || 'https://api.devnet.solana.com' }}
+          TIER: ${{ github.event.inputs.tier || 'bronze' }}
+          MAX_ATTEMPTS: ${{ github.event.inputs.attempts || '5' }}
+          INTERVAL_MS: '10000'
+          AGENT_NAME: 'GH-Actions'
+        run: node agent.js
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "### Gambling Session Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tier:** ${{ github.event.inputs.tier || 'bronze' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Network:** ${{ github.event.inputs.network || 'solana-devnet' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Attempts:** ${{ github.event.inputs.attempts || '5' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Check the logs above for detailed results." >> $GITHUB_STEP_SUMMARY
