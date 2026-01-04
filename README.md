@@ -51,20 +51,20 @@ Every bet is split as follows:
 |------------|------------|---------|
 | **Prize Pool** | 80% | Accumulates until won |
 | **House** | 10% | Platform maintenance & operations |
-| **$SUPER Token** | 10% | Buy back & burn program |
+| **$SUPER402 Token** | 10% | Buy back & burn program |
 
 **Winner Payout:** When you win, the jackpot is distributed:
 - **80%** → Winner's wallet (immediate on-chain transfer)
 - **10%** → Developer (platform operations)
-- **10%** → Buyback vault (for $SUPER token burn)
+- **10%** → Buyback vault (for $SUPER402 token burn)
 
 All distributions are handled atomically by a Solana smart contract.
 
 ---
 
-## $SUPER Token
+## $SUPER402 Token
 
-Super402.casino is powered by the **$SUPER** token. 10% of all revenue is used to buy back and permanently burn $SUPER tokens, creating constant deflationary pressure.
+Super402.casino is powered by the **$SUPER402** token. 10% of all revenue is used to buy back and permanently burn $SUPER402 tokens, creating constant deflationary pressure.
 
 - **Token CA:** Check the website header for the current contract address
 - **Utility:** Revenue share through buy back & burn
