@@ -49,11 +49,16 @@ Every bet is split as follows:
 
 | Allocation | Percentage | Purpose |
 |------------|------------|---------|
-| **Prize Pool** | 80% | Accumulates until won - winner takes all |
+| **Prize Pool** | 80% | Accumulates until won |
 | **House** | 10% | Platform maintenance & operations |
 | **$SUPER Token** | 10% | Buy back & burn program |
 
-**Winner Payout:** 100% of the prize pool goes to the winner
+**Winner Payout:** When you win, the jackpot is distributed:
+- **80%** → Winner's wallet (immediate on-chain transfer)
+- **10%** → Developer (platform operations)
+- **10%** → Buyback vault (for $SUPER token burn)
+
+All distributions are handled atomically by a Solana smart contract.
 
 ---
 
