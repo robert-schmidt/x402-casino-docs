@@ -50,8 +50,10 @@ const CONFIG = {
   // Agent name (for logging)
   agentName: process.env.AGENT_NAME || 'Agent',
 
-  // Minimum prize pool to play (0 = always play)
-  minPoolBalance: parseFloat(process.env.MIN_POOL_BALANCE || '0'),
+  // Minimum prize pool (in USDC, e.g. "100" = $100) before playing.
+  // 0 = always play. The /prize-pool API returns balance in micro-USDC, so
+  // we keep this env var in human-readable USDC and convert at compare time.
+  minPoolBalanceUsdc: parseFloat(process.env.MIN_POOL_BALANCE || '0'),
 
   // USDC Token Mint Address
   // Devnet: Use casino's devnet USDC
@@ -181,25 +183,48 @@ class GamblingAgent {
     }
   }
 
+  /**
+   * Resolve the configured tier's price (in USDC) from the live /tiers
+   * endpoint. Falls back to a small static map if the API is unreachable so
+   * the agent can still render a useful pre-flight error.
+   */
+  async getTierPriceUsdc() {
+    if (this._tierPriceCache && this._tierPriceCache.tier === this.config.tier) {
+      return this._tierPriceCache.priceUsdc;
+    }
+    try {
+      const tiers = await this.getTiers();
+      const tier = tiers.find(t => t.id === this.config.tier);
+      if (tier && tier.priceUSDC) {
+        const priceUsdc = parseInt(tier.priceUSDC) / 1e6;
+        this._tierPriceCache = { tier: this.config.tier, priceUsdc };
+        return priceUsdc;
+      }
+    } catch (_) {}
+    const fallback = { bronze: 0.1, silver: 0.5, gold: 1.0, platinum: 5.0 };
+    return fallback[this.config.tier] || 0.1;
+  }
+
   async runOnce() {
     this.stats.attempts++;
 
     try {
-      // Check prize pool if minimum is set
-      if (this.config.minPoolBalance > 0) {
+      // Check prize pool if minimum is set. /prize-pool returns balance in
+      // micro-USDC; minPoolBalanceUsdc is in USDC. Convert before comparing.
+      if (this.config.minPoolBalanceUsdc > 0) {
         const pool = await this.getPrizePool();
-        const poolBalance = parseFloat(pool.balance);
+        const poolUsdc = (Number(pool.balance) || 0) / 1e6;
 
-        if (poolBalance < this.config.minPoolBalance) {
-          this.log(`Pool ($${poolBalance.toFixed(2)}) below minimum ($${this.config.minPoolBalance}), skipping...`);
+        if (poolUsdc < this.config.minPoolBalanceUsdc) {
+          this.log(`Pool ($${poolUsdc.toFixed(2)}) below minimum ($${this.config.minPoolBalanceUsdc}), skipping...`);
           return { skipped: true, reason: 'pool_too_low' };
         }
       }
 
-      // Check USDC balance before playing
+      // Pull the canonical tier price from the casino — reconfigured tiers
+      // shouldn't break the pre-flight USDC check.
       const usdcBalance = await this.getUSDCBalance();
-      const tierPrices = { bronze: 0.1, silver: 0.5, gold: 1.0, platinum: 5.0 };
-      const requiredAmount = tierPrices[this.config.tier] || 0.1;
+      const requiredAmount = await this.getTierPriceUsdc();
 
       if (usdcBalance < requiredAmount) {
         this.log(`Insufficient USDC: ${usdcBalance.toFixed(2)} < ${requiredAmount} required`);
@@ -220,9 +245,14 @@ class GamblingAgent {
         this.stats.wins++;
         this.stats.totalWon += result.prizeAmount || 0;
         const prizeUSDC = (result.prizeAmount / 1e6).toFixed(2);
-        const multiplier = result.multiplier ? result.multiplier.toFixed(1) : '?';
-        this.log(`WIN! Prize: $${prizeUSDC} USDC (${multiplier}x)`);
-        this.log(`   TX: ${result.transactionSignature || 'N/A'}`);
+        // Casino emits prizeTransactionSignature; older builds used
+        // transactionSignature. Tolerate both.
+        const tx = result.prizeTransactionSignature || result.transactionSignature;
+        this.log(`WIN! Prize: $${prizeUSDC} USDC`);
+        this.log(`   TX: ${tx || 'N/A'}`);
+        if (result.gameId) {
+          this.log(`   Verify: ${this.config.casinoUrl}/api/casino/verify/${result.gameId}`);
+        }
         return { ...result, shouldStop: this.config.stopOnWin };
       } else {
         this.stats.losses++;
@@ -272,8 +302,11 @@ class GamblingAgent {
     }
 
     try {
+      // /prize-pool returns balance in micro-USDC and a pre-formatted
+      // balanceUSDC string; print the latter when available.
       const pool = await this.getPrizePool();
-      this.log(`   Pool:     $${pool.balance}`);
+      const human = pool.balanceUSDC || `$${(Number(pool.balance) / 1e6).toFixed(2)}`;
+      this.log(`   Pool:     ${human}`);
     } catch (e) {
       this.log(`   Pool:     (couldn't fetch)`);
     }
