@@ -100,21 +100,32 @@ Then get devnet USDC from a faucet.
 
 ### 3. Play Games
 
+The recommended path is to use the `x402-solana` client, which handles the
+402 challenge / payment-signing / retry flow automatically:
+
 ```javascript
-// Simplified example - see /examples for full implementation
-const response = await fetch('https://super402.casino/api/casino/play/bronze', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'X-SOLANA-PAY': signedPaymentHeader
-  }
+const { createX402Client } = require('x402-solana');
+
+const x402 = createX402Client({
+  wallet: walletAdapter,        // see examples/agent.js
+  network: 'solana-devnet',     // or 'solana' for mainnet
+  rpcUrl: 'https://api.devnet.solana.com',
 });
+
+const response = await x402.fetch(
+  'https://super402.casino/api/casino/play/bronze',
+  { method: 'POST', headers: { 'Content-Type': 'application/json' } }
+);
 
 const result = await response.json();
 if (result.isWinner) {
   console.log(`Won ${result.prizeAmount / 1e6} USDC!`);
+  console.log(`Verify: https://super402.casino/api/casino/verify/${result.gameId}`);
 }
 ```
+
+See [`examples/agent.js`](./examples/agent.js) for a full implementation
+including balance checks, retry/backoff, and a session summary.
 
 ---
 
@@ -173,7 +184,8 @@ CASINO_URL=https://devnet.super402.casino
 ### Production on Mainnet
 
 ```env
-SOLANA_NETWORK=solana-mainnet
+# x402-solana expects 'solana' for mainnet (not 'solana-mainnet').
+SOLANA_NETWORK=solana
 RPC_URL=https://mainnet.helius-rpc.com/?api-key=YOUR_KEY
 CASINO_URL=https://super402.casino
 ```
@@ -184,18 +196,35 @@ CASINO_URL=https://super402.casino
 
 ## Provably Fair
 
-Every game result is cryptographically verifiable:
+Every game result is cryptographically verifiable. The casino stores three
+values per game (`server_seed`, `random_value`, `threshold`) and exposes a
+public verifier endpoint that recomputes the result from the seed and your
+payment transaction signature.
 
-1. **Server Seed** - Generated and hashed before the game
-2. **Client Seed** - Your wallet address + transaction signature
-3. **Nonce** - Sequential game counter
+How a roll is generated server-side:
 
 ```
-Result = HMAC-SHA256(serverSeed, clientSeed + ":" + nonce)
-Win = (Result % 10000) < (winProbability * 10000)
+serverSeed     = crypto.randomBytes(32)            // 256-bit, generated per draw
+serverSeedHash = sha256(serverSeed)                // committed pre-draw
+randomValue    = parseInt(
+    sha256(serverSeed + transactionSignature).slice(0, 8),
+    16
+) % 10000                                          // ∈ [0, 9999]
+threshold      = floor(winProbability * 10000)     // e.g. 0.005 → 50
+isWinner       = randomValue < threshold
 ```
 
-Verify any game at: `https://super402.casino/verify/{gameId}`
+Verify any game at:
+
+```
+GET https://super402.casino/api/casino/verify/{gameId}
+```
+
+The response includes the raw `serverSeed` (post-game reveal), the stored
+`randomValue` and `threshold`, the `recomputedRandomValue`, and a single
+`verified: true|false` flag. Three negative cases are surfaced explicitly:
+`pre-migration` (game predates seed-storage), `no_transaction_signature`
+(test endpoint only), and a real fairness `mismatch`.
 
 ---
 
